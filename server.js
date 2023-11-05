@@ -861,6 +861,19 @@ app.post('/create-user', async (req, res) => {
  *     responses:
  *       200:
  *         description: User authenticated and signed in successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   description: A message indicating successful sign-in.
+ *                   example: "User authenticated and signed in successfully"
+ *                 userId:
+ *                   type: string
+ *                   description: The user's ID.
+ *                   example: "user123"
  *       401:
  *         description: Authentication failed.
  */
@@ -884,7 +897,12 @@ app.post('/users/sign-in', async (req, res) => {
 
         if (response.data.idToken) {
             // User signed in successfully
-            res.status(200).send(`User authenticated and signed in successfully`);
+            const userId = response.data.localId; // Extract the user ID
+            const responseData = {
+                message: 'User authenticated and signed in successfully',
+                userId: userId, // Include the user ID in the response data
+            };
+            res.status(200).json(responseData);
         } else {
             // Authentication failed
             res.sendStatus(401);
@@ -980,6 +998,38 @@ app.get('/users/retrieve-prescription', async (req, res) => {
     } catch (error) {
         console.error('Error retrieving prescription', error);
         res.sendStatus(404);
+    }
+});
+
+/**
+ * @swagger
+ * tags:
+ *   name: Accounts
+ *   description: Account Management
+ * /users/get-id:
+ *   get:
+ *     summary: Retrieve the currently signed-in user's ID.
+ *     tags: [Accounts]
+ *     responses:
+ *       200:
+ *         description: User ID retrieved successfully.
+ *       401:
+ *         description: User not authenticated.
+ */
+app.get('/users/get-id', async (req, res) => {
+    const idToken = req.headers.authorization; // Get the ID token from the request headers
+
+    try {
+        // Verify the ID token to get the user's UID
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+
+        // Retrieve the user's UID
+        const uid = decodedToken.uid;
+
+        res.status(200).send(uid);
+    } catch (error) {
+        console.error('Error retrieving user ID', error);
+        res.sendStatus(401);
     }
 });
 
