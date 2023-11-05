@@ -894,6 +894,7 @@ app.post('/users/sign-in', async (req, res) => {
         res.sendStatus(401);
     }
 });
+
 /**
  * @swagger
  * tags:
@@ -925,14 +926,15 @@ app.post('/users/sign-in', async (req, res) => {
  *       200:
  *         description: Prescription uploaded successfully.
  */
-
 app.post('/users/load-prescription', async (req, res) => {
     const { userId, prescription } = req.body;
 
-    // Implement prescription storage logic in the user's document in Firestore
     try {
-        // Store prescription details in Firestore
-        await firebase.firestore().collection('users').doc(userId).set({ prescription });
+        // Implement prescription storage logic in the user's document in Firestore
+        const userRef = db.collection('users').doc(userId);
+
+        // Update the user's document with the prescription
+        await userRef.update({ prescription: prescription });
 
         res.status(200).send(`Prescription uploaded successfully`);
     } catch (error) {
