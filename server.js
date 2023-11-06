@@ -7,8 +7,10 @@ const app = express();
 const port = 8383;
 const { db } = require('./firebase.js');
 const {collection, doc, setDoc} = require("firebase/firestore")
+const cors = require('cors'); // Import the cors package
 
 app.use(express.json())
+app.use(cors({origin: true}));
 
 const options = require('./swagger');
 const {admin} = require("./firebase");
@@ -380,42 +382,34 @@ app.post('/add-batch', async (req, res) => {
  *                 type: string
  *                 description: The name of the medicine.
  *                 example: "paracetamol"
- *               status:
+ *               genericName:
  *                 type: string
- *                 description: The status of the medicine (e.g., in stock, out of stock).
- *                 example: "In Stock"
- *               inStock:
- *                 type: boolean
- *                 description: The status of the medicine (e.g., in stock, out of stock).
- *                 example: false
- *               manufacturer:
+ *                 description: The generic name of the medicine
+ *                 example: "panado"
+ *               batchNumber:
+ *                 type: string
+ *                 description: The batch number of the medicine.
+ *                 example: "pcm1248932"
+ *               brandName:
  *                 type: string
  *                 description: The manufacturer or pharmaceutical company that produces the medicine.
  *                 example: "Pharma Co."
- *               dosage:
- *                 type: string
- *                 description: The recommended dosage for the medicine.
- *                 example: "10mg"
  *               expirationDate:
  *                 type: string
  *                 format: date
  *                 description: The expiration date of the medicine (YYYY-MM-DD).
  *                 example: "2024-12-31"
- *               price:
- *                 type: number
- *                 description: The price of the medicine.
- *                 example: 29.99
  *               quantity:
  *                 type: integer
  *                 description: The quantity of the medicine in stock.
  *                 example: 100
- *               description:
+ *               category:
  *                 type: string
  *                 description: Additional information or description of the medicine.
  *                 example: "Pain reliever"
  *           required:
  *             - name
- *             - status
+ *             - genericName
  *     responses:
  *       200:
  *         description: Medicine added to the inventory successfully.
@@ -423,27 +417,23 @@ app.post('/add-batch', async (req, res) => {
 app.post('/add-medicine', async (req, res) => {
     const {
         name,
-        status,
-        inStock,
-        manufacturer,
-        dosage,
+        genericName,
+        batchNumber,
+        brandName,
         expirationDate,
-        price,
         quantity,
-        description
+        category
     } = req.body;
 
-    const inventoryRef = db.collection('inventory').doc('medicines').collection(`drugs`).doc(name);
-    const res2 = await inventoryRef.set({
+    const inventoryRef = db.collection('medicines')
+    const res2 = await inventoryRef.add({
         name,
-        status,
-        inStock,
-        manufacturer,
-        dosage,
+        genericName,
+        batchNumber,
+        brandName,
         expirationDate,
-        price,
         quantity,
-        description
+        category
     }, { merge: true });
 
     res.status(200).send(`Medicine created successfully`);
@@ -831,6 +821,7 @@ app.post('/create-user', async (req, res) => {
     }
 })
 
+
 /**
  * @swagger
  * tags:
@@ -913,6 +904,7 @@ app.post('/users/sign-in', async (req, res) => {
     }
 });
 
+
 /**
  * @swagger
  * tags:
@@ -961,6 +953,7 @@ app.post('/users/load-prescription', async (req, res) => {
     }
 });
 
+
 /**
  * @swagger
  * tags:
@@ -981,7 +974,7 @@ app.post('/users/load-prescription', async (req, res) => {
  *         description: User's prescription retrieved successfully.
  *       404:
  *         description: Prescription not found.
- */
+ */  //needs work
 app.get('/users/retrieve-prescription', async (req, res) => {
     const userId = req.query.userId;
 
@@ -1006,32 +999,55 @@ app.get('/users/retrieve-prescription', async (req, res) => {
  * tags:
  *   name: Accounts
  *   description: Account Management
- * /users/get-id:
+ * /users/get-user-id:
  *   get:
- *     summary: Retrieve the currently signed-in user's ID.
+ *     summary: Get the user's userID by email address.
  *     tags: [Accounts]
+ *     parameters:
+ *       - in: query
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The email address of the user.
  *     responses:
  *       200:
- *         description: User ID retrieved successfully.
- *       401:
- *         description: User not authenticated.
+ *         description: User found, and their userID is returned.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 userId:
+ *                   type: string
+ *                   description: The user's ID.
+ *                   example: "user123"
+ *       404:
+ *         description: User not found.
  */
-app.get('/users/get-id', async (req, res) => {
-    const idToken = req.headers.authorization; // Get the ID token from the request headers
+app.get('/users/get-user-id', async (req, res) => {
+    const { email } = req.query;
 
     try {
-        // Verify the ID token to get the user's UID
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        // Implement logic to retrieve the user's userID by email address
+        const usersRef = db.collection('users');
+        const querySnapshot = await usersRef.where('email', '==', email).get();
 
-        // Retrieve the user's UID
-        const uid = decodedToken.uid;
+        if (querySnapshot.empty) {
+            res.status(404).send("User not found");
+            return;
+        }
 
-        res.status(200).send(uid);
+        // Assuming there's only one user with the given email, you can directly access their ID
+        const userId = querySnapshot.docs[0].id;
+
+        res.status(200).json({ userId });
     } catch (error) {
         console.error('Error retrieving user ID', error);
-        res.sendStatus(401);
+        res.sendStatus(500);
     }
 });
+
 
 /**
  * @swagger
@@ -1049,12 +1065,6 @@ app.get('/users/get-id', async (req, res) => {
  *         schema:
  *           type: string
  *         description: The name of the required medicine.
- *       - in: query
- *         name: location
- *         required: true
- *         schema:
- *           type: string
- *         description: The location for searching facilities.
  *     responses:
  *       200:
  *         description: List of facilities that have the required medicine.
@@ -1064,13 +1074,13 @@ app.get('/users/get-id', async (req, res) => {
  *               $ref: '#/components/schemas/Facility'
  */
 app.get('/facilities/search-medicine', async (req, res) => {
-    const { medicine, location } = req.query;
+    const { medicine } = req.query;
 
     try {
-        const facilitiesRef = db.collection('facilities');
+        const facilitiesRef = db.collection('medicines')
         const querySnapshot = await facilitiesRef
-            .where('location', '==', location)
-            .where('medicines', 'array-contains', medicine)
+            .where('name', '==', medicine)/*
+            .where('medicines', 'array-contains', medicine)*/
             .get();
         const facilities = [];
 
@@ -1084,6 +1094,7 @@ app.get('/facilities/search-medicine', async (req, res) => {
         res.sendStatus(500);
     }
 });
+
 
 /**
  * @swagger
