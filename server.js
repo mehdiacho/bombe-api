@@ -14,6 +14,7 @@ app.use(cors({origin: true}));
 
 const options = require('./swagger');
 const {admin} = require("./firebase");
+const axios = require("axios");
 
 const specs = swaggerJsdoc(options);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
@@ -794,7 +795,7 @@ app.post('/facilities/add-employee', async (req, res) => {
  */
 app.post('/create-user', async (req, res) => {
     const { username, email, password } = req.body;
-
+/*
     try {
         // Create a user in Firebase Authentication
         const userRecord = await admin.auth().createUser({
@@ -818,6 +819,38 @@ app.post('/create-user', async (req, res) => {
     } catch (error) {
         console.error('Error creating user account: ' + error.message);
         res.sendStatus(500);
+    }*/
+    const apikey = "AIzaSyB3HPIWtVI0f21JhPVuusLcV8xzGYPeo1M"
+
+    try {
+        // Implement user authentication and sign-in logic with Firebase Authentication
+        const signUpEndpoint = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apikey}`; // Replace with your Firebase API key
+
+        const signUpData = {
+            email: email,
+            password: password,
+            returnSecureToken: true,
+        };
+
+        // Send a POST request to Firebase Auth for sign-in
+        const axios = require('axios');
+        const response = await axios.post(signUpEndpoint, signUpData);
+
+        if (response.data.idToken) {
+            // User signed in successfully
+            const userId = response.data.localId; // Extract the user ID
+            const responseData = {
+                message: 'User authenticated and signed in successfully',
+                userId: userId, // Include the user ID in the response data
+            };
+            res.status(200).json(responseData);
+        } else {
+            // Authentication failed
+            res.sendStatus(401);
+        }
+    } catch (error) {
+        console.error('Authentication failed', error);
+        res.sendStatus(401);
     }
 })
 
